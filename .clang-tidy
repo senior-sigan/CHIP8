@@ -1,0 +1,16 @@
+---
+CheckOptions:
+  - { key: readability-identifier-naming.NamespaceCase, value: lower_case }
+  - { key: readability-identifier-naming.ClassCase, value: CamelCase }
+  - { key: readability-identifier-naming.StructCase, value: CamelCase }
+  - { key: readability-identifier-naming.FunctionCase, value: CamelCase }
+  - { key: readability-identifier-naming.MethodCase, value: CamelCase }
+  - { key: readability-identifier-naming.ClassMemberCase, value: lower_case }
+  - { key: readability-identifier-naming.VariableCase, value: lower_case }
+  - { key: readability-identifier-naming.GlobalConstantCase, value: UPPER_CASE }
+  - {
+    key: readability-identifier-naming.TemplateParameterCase,
+    value: CamelCase,
+  }
+Checks: "-*, bugprone-*, clang-diagnostic-*, -clang-diagnostic-unused-command-line-argument, google-*, -google-runtime-references, misc-*, -misc-noexcept*, -misc-unused-parameters, modernize-*, -modernize-avoid-c-arrays, -modernize-deprecated-headers, -modernize-raw-string-literal, -modernize-return-braced-init-list, -modernize-use-auto, -modernize-use-equals-delete, -modernize-use-nodiscard, -modernize-use-using, -modernize-use-trailing-return-type, performance-*, readability-*, -readability-implicit-bool-conversion, -readability-isolate-declaration, -readability-magic-numbers, -readability-qualified-auto, -readability-uppercase-literal-suffix"
+FormatStyle: file
