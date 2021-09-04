@@ -1,3 +1,5 @@
+#include <raylib.h>
+
 #include <cstdint>
 #include <cstring>
 #include <ctime>
@@ -34,6 +36,12 @@ constexpr uint8_t FONT_SET[FONT_SET_LEN] = {
     0xF0, 0x80, 0xF0, 0x80, 0xF0,  // E
     0xF0, 0x80, 0xF0, 0x80, 0x80   // F
 };
+
+constexpr int PIXEL_SIZE = 8;
+constexpr int CANVAS_WIDTH = GFX_COLS * PIXEL_SIZE;
+constexpr int CANVAS_HEIGHT = GFX_ROWS * PIXEL_SIZE;
+constexpr Vector2 ZERO_VEC = {0, 0};
+RenderTexture2D canvas;
 
 struct OpCode {
   uint16_t opcode;
@@ -83,12 +91,13 @@ class Machine {
     std::memset(regs_, 0, REG_NUM);
     std::memset(memory_, 0, MEM_SIZE);
     std::memcpy(memory_, FONT_SET, FONT_SET_LEN);
+    std::memset(display_, 0, GFX_SIZE);
   }
 
   void UnknownOpCode(OpCode opcode) {
     std::cout << "Unknown opcode '" << std::hex << opcode.opcode << "'"
               << std::endl;
-    exit(-1);
+//    exit(-1);
   }
 
   void LD_I(OpCode opcode) {
@@ -154,6 +163,10 @@ class Machine {
     std::srand(std::time(nullptr));
     InitMachine();
     LoadRom(reinterpret_cast<char*>(memory_ + START_OF_MEM), rom_path);
+  }
+
+  void Restart() {
+    // TODO:
   }
 
   void PrintMemory() {
@@ -245,7 +258,64 @@ class Machine {
     std::cout << std::setfill('-') << std::setw(GFX_COLS + 3) << '\n'
               << std::endl;
   }
+
+  bool GetPixel(int row, int col) const {
+    if (row >= 0 && col >= 0 && col < GFX_COLS && row < GFX_ROWS) {
+      return display_[row][col];
+    }
+    return false;
+  }
+
+  bool ShouldRedraw() const {
+    return display_flag_;
+  }
 };
+
+void Draw(Machine& machine) {
+  if (!machine.ShouldRedraw()) {
+    return;
+  }
+
+  BeginTextureMode(canvas);
+  ClearBackground(BLACK);
+  for (int row = 0; row < GFX_ROWS; row++) {
+    for (int col = 0; col < GFX_COLS; col++) {
+      if (machine.GetPixel(row, col)) {
+        DrawRectangle(col * PIXEL_SIZE, row * PIXEL_SIZE, PIXEL_SIZE,
+                      PIXEL_SIZE, WHITE);
+      }
+    }
+  }
+  EndTextureMode();
+}
+
+void Update(Machine& machine) {
+  machine.Step();
+}
+
+Rectangle GetCanvasTarget() {
+  float sh = static_cast<float>(GetScreenHeight());
+  float sw = static_cast<float>(GetScreenWidth());
+  float scale = fminf(sw / CANVAS_WIDTH, sh / CANVAS_HEIGHT);
+  Rectangle rec = {0, 0, CANVAS_WIDTH * scale, CANVAS_HEIGHT * scale};
+  return rec;
+}
+
+void GameLoop(Machine& machine) {
+  Update(machine);
+
+  BeginDrawing();
+  ClearBackground(GREEN);
+
+  Draw(machine);
+
+  Rectangle canvas_field = {0, 0, static_cast<float>(canvas.texture.width),
+                            -static_cast<float>(canvas.texture.height)};
+  Rectangle canvas_target = GetCanvasTarget();
+  DrawTexturePro(canvas.texture, canvas_field, canvas_target, ZERO_VEC, 0.0f,
+                 WHITE);
+  EndDrawing();
+}
 
 int main(int argc, char* argv[]) {
   if (argc != 2) {
@@ -254,11 +324,18 @@ int main(int argc, char* argv[]) {
   }
   Machine machine(argv[1]);
   machine.PrintMemory();
-  while (true) {
-    machine.Step();
 
-    machine.Draw();
+  SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+  InitWindow(CANVAS_WIDTH, CANVAS_HEIGHT, "CHIP8");
+  SetTargetFPS(60);
+  canvas = LoadRenderTexture(CANVAS_WIDTH, CANVAS_HEIGHT);
+  SetTextureFilter(canvas.texture, FILTER_POINT);
+
+  while (!WindowShouldClose()) {
+    GameLoop(machine);
   }
+
+  CloseWindow();
 
   return 0;
 }
