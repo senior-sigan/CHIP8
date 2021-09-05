@@ -76,17 +76,17 @@ class Machine {
   uint16_t index_reg_;
   uint16_t pc_;  // program counter
   uint8_t sp_;   // stack_ pointer
-  bool display_flag_;
   uint8_t regs_[REG_NUM]{};
   uint8_t memory_[MEM_SIZE]{};
   uint16_t stack_[STACK_SIZE]{};
   uint8_t display_[GFX_ROWS][GFX_COLS];
 
+  const uint8_t DRAW_FLAG = 0xF;
+
   void InitMachine() {
     index_reg_ = INDEX_START;
     pc_ = START_OF_MEM;  // ???
     sp_ = 0;
-    display_flag_ = false;
 
     std::memset(regs_, 0, REG_NUM);
     std::memset(memory_, 0, MEM_SIZE);
@@ -97,7 +97,7 @@ class Machine {
   void UnknownOpCode(OpCode opcode) {
     std::cout << "Unknown opcode '" << std::hex << opcode.opcode << "'"
               << std::endl;
-//    exit(-1);
+    //    exit(-1);
   }
 
   void LD_I(OpCode opcode) {
@@ -131,8 +131,7 @@ class Machine {
   }
 
   void DRW(OpCode op_code) {
-    display_flag_ = true;
-    regs_[0xF] = 0;  // VF register flag
+    regs_[DRAW_FLAG] = 0;  // VF register flag
 
     uint8_t x = regs_[op_code.x] % GFX_COLS;
     uint8_t y = regs_[op_code.y] % GFX_ROWS;
@@ -141,10 +140,12 @@ class Machine {
       uint8_t pixels = memory_[index_reg_ + j];
       for (uint8_t i = 0; i < 8; i++) {
         auto pixel = GetBit(pixels, 7 - i);
-        if ((pixel & display_[y][x]) == 0) {
-          regs_[0xF] = 1;
-        }
-        display_[(y + j) % GFX_ROWS][(x + i) % GFX_COLS] ^= pixel;
+        auto& display_pixel = display_[(y + j) % GFX_ROWS][(x + i) % GFX_COLS];
+        // TODO: test it. It seems to be wrong.
+        regs_[DRAW_FLAG] =
+            regs_[DRAW_FLAG] || ((pixel ^ display_pixel) != display_pixel);
+
+        display_pixel ^= pixel;
       }
     }
   }
@@ -159,7 +160,7 @@ class Machine {
 
  public:
   explicit Machine(const std::string& rom_path)
-      : index_reg_(0), pc_(START_OF_MEM), sp_(0), display_flag_(false) {
+      : index_reg_(0), pc_(START_OF_MEM), sp_(0) {
     std::srand(std::time(nullptr));
     InitMachine();
     LoadRom(reinterpret_cast<char*>(memory_ + START_OF_MEM), rom_path);
@@ -238,41 +239,30 @@ class Machine {
     pc_ = (pc_ + 2) % MEM_SIZE;
   }
 
-  void Draw() {
-    if (!display_flag_) {
-      return;
-    }
-    display_flag_ = false;
-    std::cout << std::setfill('-') << std::setw(GFX_COLS + 3) << '\n';
-    for (int i = 0; i < GFX_ROWS; i++) {
-      std::cout << "|";
-      for (int j = 0; j < GFX_COLS; j++) {
-        if (display_[i][j] == 1) {
-          std::cout << "*";
-        } else {
-          std::cout << " ";
-        }
-      }
-      std::cout << "|\n";
-    }
-    std::cout << std::setfill('-') << std::setw(GFX_COLS + 3) << '\n'
-              << std::endl;
-  }
-
   bool GetPixel(int row, int col) const {
     if (row >= 0 && col >= 0 && col < GFX_COLS && row < GFX_ROWS) {
-      return display_[row][col];
+      return display_[row][col] == 1;
     }
     return false;
   }
 
-  bool ShouldRedraw() const {
-    return display_flag_;
+  bool CheckRedrawAndSwapFlag() {
+    bool flag = regs_[DRAW_FLAG];
+    regs_[DRAW_FLAG] = 0;
+    return flag;
   }
 };
 
+Rectangle GetCanvasTarget() {
+  float sh = static_cast<float>(GetScreenHeight());
+  float sw = static_cast<float>(GetScreenWidth());
+  float scale = fminf(sw / CANVAS_WIDTH, sh / CANVAS_HEIGHT);
+  Rectangle rec = {0, 0, CANVAS_WIDTH * scale, CANVAS_HEIGHT * scale};
+  return rec;
+}
+
 void Draw(Machine& machine) {
-  if (!machine.ShouldRedraw()) {
+  if (!machine.CheckRedrawAndSwapFlag()) {
     return;
   }
 
@@ -293,28 +283,18 @@ void Update(Machine& machine) {
   machine.Step();
 }
 
-Rectangle GetCanvasTarget() {
-  float sh = static_cast<float>(GetScreenHeight());
-  float sw = static_cast<float>(GetScreenWidth());
-  float scale = fminf(sw / CANVAS_WIDTH, sh / CANVAS_HEIGHT);
-  Rectangle rec = {0, 0, CANVAS_WIDTH * scale, CANVAS_HEIGHT * scale};
-  return rec;
-}
-
 void GameLoop(Machine& machine) {
-  Update(machine);
-
   BeginDrawing();
   ClearBackground(GREEN);
-
   Draw(machine);
-
   Rectangle canvas_field = {0, 0, static_cast<float>(canvas.texture.width),
                             -static_cast<float>(canvas.texture.height)};
   Rectangle canvas_target = GetCanvasTarget();
   DrawTexturePro(canvas.texture, canvas_field, canvas_target, ZERO_VEC, 0.0f,
                  WHITE);
   EndDrawing();
+
+  Update(machine);
 }
 
 int main(int argc, char* argv[]) {
@@ -327,7 +307,7 @@ int main(int argc, char* argv[]) {
 
   SetConfigFlags(FLAG_WINDOW_RESIZABLE);
   InitWindow(CANVAS_WIDTH, CANVAS_HEIGHT, "CHIP8");
-  SetTargetFPS(60);
+  //  SetTargetFPS(60);
   canvas = LoadRenderTexture(CANVAS_WIDTH, CANVAS_HEIGHT);
   SetTextureFilter(canvas.texture, FILTER_POINT);
 
