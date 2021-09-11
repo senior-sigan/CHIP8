@@ -44,6 +44,9 @@ constexpr Vector2 ZERO_VEC = {0, 0};
 RenderTexture2D canvas;
 
 struct OpCode {
+  // type_nnn
+  // type_x_kk
+  // type_x_y_n
   uint16_t opcode;
   uint16_t type;
   uint8_t x;
@@ -164,6 +167,7 @@ class Machine {
     pc_ = op_code.nnn - 2;
   }
 
+
   void SE_VxVy(const OpCode& op_code) {
     if (regs_[op_code.x] == regs_[op_code.y]) {
       pc_ = pc_ + 2;
@@ -174,7 +178,40 @@ class Machine {
 
   }
 
-  void SHL(const OpCode& op_code) {
+  void SHL(const OpCode& op_code) {}
+
+  void Call(const OpCode& op_code) {
+    stack_[sp_] = pc_;
+    sp_++;
+    pc_ = op_code.nnn - 2;
+  }
+
+  void Store(const OpCode& op_code) {
+    regs_[op_code.x] = regs_[op_code.y];
+  }
+
+  void StoreAnd(const OpCode& op_code) {
+    regs_[op_code.x] &= regs_[op_code.y];
+  }
+  void StoreOr(const OpCode& op_code) {
+    regs_[op_code.x] |= regs_[op_code.y];
+  }
+  void StoreXor(const OpCode& op_code) {
+    regs_[op_code.x] ^= regs_[op_code.y];
+  }
+
+  void StoreAdd(const OpCode& op_code) {
+    auto old = regs_[op_code.x];
+    regs_[op_code.x] += regs_[op_code.y];
+
+    if (old > regs_[op_code.x]) { // overflow check
+      regs_[DRAW_FLAG] = 1;
+    } else {
+      regs_[DRAW_FLAG] = 0;
+    }
+  }
+
+  void StoreAtI(const OpCode& op_code) {
 
   }
 
@@ -227,6 +264,9 @@ class Machine {
       case 0x1000:
         JP(opcode);
         break;
+      case 0x2000:
+        Call(opcode);
+        break;
       case 0x3000:
         SE_Vx(opcode);
         break;
@@ -250,6 +290,21 @@ class Machine {
           case 0xE:
             SHL(opcode);
             break;
+          case 0:
+            Store(opcode);
+            break;
+          case 1:
+            StoreOr(opcode);
+            break;
+          case 2:
+            StoreAnd(opcode);
+            break;
+          case 3:
+            StoreXor(opcode);
+            break;
+          case 4:
+            StoreAdd(opcode);
+            break;
           default:
             UnknownOpCode(opcode);
             break;
@@ -266,6 +321,9 @@ class Machine {
         break;
       case 0xF000:
         switch (opcode.kk) {
+          case 0x33:
+            StoreAtI(opcode);
+            break;
           default:
             UnknownOpCode(opcode);
             break;
