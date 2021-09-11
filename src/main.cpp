@@ -117,8 +117,14 @@ class Machine {
     }
   }
 
-  void SNE_Vx(OpCode opcode) {
+  void SNE_Vx(const OpCode& opcode) {
     if (regs_[opcode.x] != opcode.kk) {
+      pc_ = pc_ + 2;
+    }
+  }
+
+  void SNE_VxVy(const OpCode& opcode) {
+    if (regs_[opcode.x] != regs_[opcode.y]) {
       pc_ = pc_ + 2;
     }
   }
@@ -130,16 +136,14 @@ class Machine {
 
   void RET() {
     pc_ = stack_[sp_];
-    std::cerr << "SP overflow at RET"
-              << std::endl;        // a warning if it's overflow?
     sp_ = (sp_ - 1) % STACK_SIZE;  // I made this behaviour to be specified
   }
 
-  void LD_Vx(OpCode opcode) {
+  void LD_Vx(const OpCode& opcode) {
     regs_[opcode.x] = opcode.kk;
   }
 
-  void DRW(OpCode op_code) {
+  void DRW(const OpCode& op_code) {
     regs_[DRAW_FLAG] = 0;  // VF register flag
 
     uint8_t x = regs_[op_code.x] % GFX_COLS;
@@ -167,16 +171,13 @@ class Machine {
     pc_ = op_code.nnn - 2;
   }
 
-
   void SE_VxVy(const OpCode& op_code) {
     if (regs_[op_code.x] == regs_[op_code.y]) {
       pc_ = pc_ + 2;
     }
   }
 
-  void SHR(const OpCode& op_code) {
-
-  }
+  void SHR(const OpCode& op_code) {}
 
   void SHL(const OpCode& op_code) {}
 
@@ -204,7 +205,7 @@ class Machine {
     auto old = regs_[op_code.x];
     regs_[op_code.x] += regs_[op_code.y];
 
-    if (old > regs_[op_code.x]) { // overflow check
+    if (old > regs_[op_code.x]) {  // overflow check
       regs_[DRAW_FLAG] = 1;
     } else {
       regs_[DRAW_FLAG] = 0;
@@ -212,7 +213,21 @@ class Machine {
   }
 
   void StoreAtI(const OpCode& op_code) {
+    uint8_t vx = regs_[op_code.x];
+    memory_[index_reg_] = (vx / 100) % 10;
+    memory_[index_reg_ + 1] = (vx / 10) % 10;
+    memory_[index_reg_ + 2] = vx % 10;
+  }
 
+  void AddIVx(const OpCode& opcode) {
+    index_reg_ += regs_[opcode.x];
+  }
+
+  void LdVxI(const OpCode& opcode) {
+    for (uint8_t i = 0; i <= opcode.x; i++) {
+      regs_[i] = memory_[index_reg_ + i];
+    }
+    index_reg_ += opcode.x + 1;
   }
 
  public:
@@ -310,6 +325,9 @@ class Machine {
             break;
         }
         break;
+      case 0x9000:
+        SNE_VxVy(opcode);
+        break;
       case 0xA000:
         LD_I(opcode);
         break;
@@ -323,6 +341,12 @@ class Machine {
         switch (opcode.kk) {
           case 0x33:
             StoreAtI(opcode);
+            break;
+          case 0x1E:
+            AddIVx(opcode);
+            break;
+          case 0x65:
+            LdVxI(opcode);
             break;
           default:
             UnknownOpCode(opcode);
