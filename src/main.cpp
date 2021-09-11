@@ -114,6 +114,12 @@ class Machine {
     }
   }
 
+  void SNE_Vx(OpCode opcode) {
+    if (regs_[opcode.x] != opcode.kk) {
+      pc_ = pc_ + 2;
+    }
+  }
+
   void CLS() {
     // TODO: clear screen
     std::memset(display_, 0, GFX_SIZE);
@@ -156,6 +162,20 @@ class Machine {
 
   void JP(const OpCode& op_code) {
     pc_ = op_code.nnn - 2;
+  }
+
+  void SE_VxVy(const OpCode& op_code) {
+    if (regs_[op_code.x] == regs_[op_code.y]) {
+      pc_ = pc_ + 2;
+    }
+  }
+
+  void SHR(const OpCode& op_code) {
+
+  }
+
+  void SHL(const OpCode& op_code) {
+
   }
 
  public:
@@ -207,6 +227,34 @@ class Machine {
       case 0x1000:
         JP(opcode);
         break;
+      case 0x3000:
+        SE_Vx(opcode);
+        break;
+      case 0x4000:
+        SNE_Vx(opcode);
+        break;
+      case 0x5000:
+        SE_VxVy(opcode);
+        break;
+      case 0x6000:
+        LD_Vx(opcode);
+        break;
+      case 0x7000:
+        Add(opcode);
+        break;
+      case 0x8000:
+        switch (opcode.n) {
+          case 0x6:
+            SHR(opcode);
+            break;
+          case 0xE:
+            SHL(opcode);
+            break;
+          default:
+            UnknownOpCode(opcode);
+            break;
+        }
+        break;
       case 0xA000:
         LD_I(opcode);
         break;
@@ -215,15 +263,6 @@ class Machine {
         break;
       case 0xD000:
         DRW(opcode);
-        break;
-      case 0x3000:
-        SE_Vx(opcode);
-        break;
-      case 0x6000:
-        LD_Vx(opcode);
-        break;
-      case 0x7000:
-        Add(opcode);
         break;
       case 0xF000:
         switch (opcode.kk) {
